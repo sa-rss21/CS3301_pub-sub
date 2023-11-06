@@ -1,20 +1,15 @@
-from zeep import Client
-from zeep.cache import SqliteCache
-from zeep.transports import Transport
+import xmlrpc.client
 
 
 class Publisher:
-    def __init__(self, client_id, service_url):
+    def __init__(self, id, broker_url):
+        self.id = id
+        self.broker_url = broker_url
+        self.client = xmlrpc.client.ServerProxy(self.broker_url)
 
-        self.client_id = client_id
-        transport = Transport(SqliteCache())
-        self.client = Client(service_url, transport=transport)
-    def send_message(self, message: str):
+    def publish(self, topic, message):
         try:
+            self.client.publish(topic, self.id, message)
 
-            result = self.client.service.publish_message(message)
-            return result
         except Exception as e:
-            # Handle any exceptions that may occur during the SOAP request
-            print(f"Error sending message: {str(e)}")
-            return None
+            print(f"Failed to publish message: {e}")

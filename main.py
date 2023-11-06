@@ -1,46 +1,32 @@
 import time
-from concurrent.futures import ThreadPoolExecutor
-import random
-import string
-from publisher import Publisher
+import xmlrpc.server
 from broker import MessageBroker
-from spyne import Application
-from spyne.protocol.soap import Soap11
-from spyne.server.wsgi import WsgiApplication
-from wsgiref.simple_server import make_server
+from publisher import Publisher
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
-
-def start_server():
-    app = Application([MessageBroker], tns='http://example.com/pub', in_protocol=Soap11(validator='lxml'),
-                      out_protocol=Soap11())
-    server = make_server('127.0.0.1', 8000, WsgiApplication(app))
+def broker_server():
+    server = xmlrpc.server.SimpleXMLRPCServer(("localhost", 8000), allow_none=True)
+    server.register_instance(MessageBroker())
     server.serve_forever()
 
+def send_message(client_id, broker_url, topic, message):
+    publisher = Publisher(client_id, broker_url)
+    publisher.publish(topic, message)
 
-def generate_random_message(id):
-    # Generate a random message
-    message = ''.join(random.choice(string.ascii_letters) for _ in range(10))
-    return f"PUBLISH:CH{id}:{id}:{message}"
+if __name__ == "__main__":
+    # Start the broker server in a separate thread
+    broker_thread = threading.Thread(target=broker_server)
+    broker_thread.daemon = True  # So that it terminates when the main program exits
+    broker_thread.start()
 
+    num_clients = 1000
+    broker_url = "http://localhost:8000/"  # URL of the message broker server
+    topic = "topic1"
+    message = "Hello, World!"
 
-def run_client(id, url):
-    client = Publisher(id, url)
+    # Create clients and have them send one message each concurrently using ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=num_clients) as executor:
+        for client_id in range(num_clients):
+            executor.submit(send_message, client_id, broker_url, topic, message)
 
-    message = generate_random_message(id)
-    client.send_message(message)
-
-
-
-if __name__ == '__main__':
-    url = 'http://localhost:8000?wsdl'
-    messages = 1000
-
-    with ThreadPoolExecutor(max_workers=messages) as executor:
-        # Start the server concurrently
-        executor.submit(start_server)
-
-        # Simulate 1000 clients independently publishing one message each
-        for i in range(messages):
-            executor.submit(run_client, i, url)
-            time.sleep(1/messages)
-    # The main thread doesn't wait for clients to complete, so it can exit without blocking them

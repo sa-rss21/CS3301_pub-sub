@@ -1,30 +1,11 @@
 import queue
 import time
 from enum import Enum
-import threading
-from spyne import Application, ServiceBase, Iterable, Unicode, rpc
-import asyncio
-from spyne import Application, rpc, ServiceBase, Unicode, Iterable
-from spyne.protocol.soap import Soap11
-from spyne.server.wsgi import WsgiApplication
+
 from spyne.model.complex import ComplexModel
 from spyne.model.primitive import String
+import xmlrpc.server
 
-
-class Message(Enum):
-    TYPE = "TYPE"
-    SENDER = "SENDER"
-    CONTENT = "CONTENT"
-    TIMESTAMP = "TIME"
-    CHANNEL = "CH"
-
-
-class ReplyToHeader(ComplexModel):
-    message_id = String
-
-
-class MessageIDHeader(ComplexModel):
-    correlation_id = String
 
 
 class MessageQueueManager:
@@ -59,33 +40,18 @@ class MessageQueueManager:
                 yield message
 
 
-class MessageBroker(ServiceBase):
+class MessageBroker:
+    def __init__(self):
+        self.subscribers = {}
+        self.message_queue = MessageQueueManager()
+    def subscribe(self, topic, callback_url):
+        # Implement subscription logic
+        pass
 
-    subscribers = {}
-    queue_manager = MessageQueueManager()
+    def publish(self, topic, id, message):
+        # Implement publishing logic
+        print(f"Message by Client: {id} published to topic {topic}")
+        self.message_queue.publish_message(topic, id, message)
 
-    @rpc(Unicode,_returns=Iterable(Unicode), _is_async=True)
-    def publish_message(ctx, message):
-        try:
-            print(message)
-            message_split = message.split(":")
-            print(MessageBroker.queue_manager.queues)
-
-            if message_split[0] == "PUBLISH":
-                MessageBroker.queue_manager.publish_message(message_split[1], message_split[2], message_split[3])
-
-        except Exception as e:
-            print(f"Error handling message: {str(e)}")
-        yield message
-
-    def create_channel(self, channel_name):
-        # Create a new channel by creating a message queue
-        self.queue_manager.create_queue(channel_name)
-        self.subscribers[channel_name] = []
-
-    def delete_channel(self, channel_name):
-        # Delete a channel and its associated message queue
-        self.queue_manager.delete_queue(channel_name)
-        del self.subscribers[channel_name]
 
 
