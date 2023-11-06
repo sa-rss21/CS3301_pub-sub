@@ -1,14 +1,20 @@
-from connection import connect_to_broker
+from zeep import Client
+from zeep.cache import SqliteCache
+from zeep.transports import Transport
 
 
 class Publisher:
-    def __init__(self, client_id, broker_host, broker_port):
+    def __init__(self, client_id, service_url):
+
         self.client_id = client_id
-        self.broker_socket = connect_to_broker(broker_host, broker_port)
+        transport = Transport(SqliteCache())
+        self.client = Client(service_url, transport=transport)
+    def send_message(self, message: str):
+        try:
 
-    def send_message(self, channel_name, message):
-        if self.broker_socket:
-            data = f"{channel_name}:{self.client_id}:{message}"
-            self.broker_socket.send(data.encode('utf-8'))
-
-
+            result = self.client.service.publish_message(message)
+            return result
+        except Exception as e:
+            # Handle any exceptions that may occur during the SOAP request
+            print(f"Error sending message: {str(e)}")
+            return None
