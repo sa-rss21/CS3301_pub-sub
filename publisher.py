@@ -10,5 +10,6 @@ class Publisher:
     def publish(self, topic, message):
         try:
             self.client.publish(topic, self.id, message)
+
         except Exception as e:
             print(f"Failed to publish message: {e}")

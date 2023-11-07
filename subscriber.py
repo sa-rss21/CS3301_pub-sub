@@ -14,10 +14,8 @@ class Subscriber:
         self.broker_url = broker_url
         self.broker = xmlrpc.client.ServerProxy(self.broker_url)
 
-        # Start the subscriber in a separate thread
-        broker_thread = threading.Thread(target=self.start_listening)
-        broker_thread.daemon = True  # So that it terminates when the main program exits
-        broker_thread.start()
+        subscriber_thread = threading.Thread(target=self.start_listening)
+        subscriber_thread.start()
 
     def subscribe(self, topic):
         try:
@@ -29,12 +27,13 @@ class Subscriber:
 
     def start_listening(self):
         server = xmlrpc.server.SimpleXMLRPCServer((self.host, self.port), allow_none=True)
-        server.register_instance(self)
+        server.register_function(self.notify, "notify")
         server.serve_forever()
 
     def notify(self, messages):
         for message in messages:
             print(f"Received message by subscriber {self.id}: {message}")
+        return 0
 
     def unsubscribe(self, topic):
         try:
