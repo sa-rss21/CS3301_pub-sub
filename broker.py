@@ -34,7 +34,6 @@ class MessageQueueManager:
 
     def get_messages(self, topic):
         # Subscribe to a channel and receive messages
-
         if self.get_queue(topic):
             while not self.queues[topic].empty():
                 # return all messages
@@ -56,43 +55,29 @@ class MessageBroker:
         server = xmlrpc.server.SimpleXMLRPCServer((self.host, self.port), allow_none=True)
         server.register_function(self.subscribe, "subscribe")
         server.register_function(self.publish, "publish")
+        server.register_function(self.get_messages, "get_messages")
         server.serve_forever()
 
-    def subscribe(self, topic, callback):
+    def subscribe(self, topic, id):
         if topic not in self.subscribers:
             self.subscribers[topic] = []
         if not self.message_queue.get_queue(topic):
             self.message_queue.create_queue(topic)
-        sub = xmlrpc.client.ServerProxy(callback)
-        self.subscribers[topic].append(sub)
+        self.subscribers[topic].append(id)
 
-    def unsubscribe(self, topic, callback):
-        if topic in self.subscribers and callback in self.subscribers[topic]:
-            self.subscribers[topic].remove(callback)
+    def unsubscribe(self, topic, id):
+        if topic in self.subscribers and id in self.subscribers[topic]:
+            self.subscribers[topic].remove(id)
             if not self.subscribers[topic]:
                 del self.subscribers[topic]
-
-    def notify_subscribers(self, topic):
-        if self.has_subscribers(topic):
-            messages = list(self.message_queue.get_messages(topic))
-            self.notify_subscriber(topic, messages)
-
-    def notify_subscriber(self, topic, messages):
-        if not self.has_subscribers(topic):
-            return
-        for subscriber in self.subscribers[topic]:
-            try:
-                ret = subscriber.notify(messages)
-            except Exception as e:
-                print(f"Failed to notify subscriber for topic {topic}: {e}")
 
     def publish(self, topic, id, message):
         if not self.subscribers.get(topic):
             self.subscribers[topic] = []
         self.message_queue.publish_message(topic, id, message)
 
-        # Schedule the notification after a delay (e.g., 5 seconds)
-        self.notify_subscribers(topic)
+    def get_messages(self, topic):
+        return list(self.message_queue.get_messages(topic))
 
     def has_subscribers(self, topic):
         return len(self.subscribers.get(topic, [])) != 0

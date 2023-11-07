@@ -1,44 +1,53 @@
+import threading
+import time
 import xmlrpc.client
 import xmlrpc.server
-import threading
+
 
 class Subscriber:
 
-    def __init__(self, id, broker_url, callback_url):
+    def __init__(self, id, broker_url):
         self.id = id
-        self.callback_url = callback_url
-        url_trimmed = self.callback_url.replace("http://", "").split(":")
-        self.host = url_trimmed[0]
-        self.port = int(url_trimmed[1])
-        self.client_id = None
-        self.broker_url = broker_url
-        self.broker = xmlrpc.client.ServerProxy(self.broker_url)
 
-        subscriber_thread = threading.Thread(target=self.start_listening)
-        subscriber_thread.start()
+        self.broker_url = broker_url
+        self.topics = []
+        self.broker = xmlrpc.client.ServerProxy(self.broker_url)
+        t = threading.Thread(target=self.start_polling)
+        t.start()
 
     def subscribe(self, topic):
         try:
-            if self.client_id is None:
-                self.client_id = self.broker.subscribe(topic, self.callback_url)
+
+            self.broker.subscribe(topic, self.id)
+            self.topics.append(topic)
         except Exception as e:
             print(f"Failed to subscribe: {e}")
-        return self.id
 
-    def start_listening(self):
-        server = xmlrpc.server.SimpleXMLRPCServer((self.host, self.port), allow_none=True)
-        server.register_function(self.notify, "notify")
-        server.serve_forever()
-
-    def notify(self, messages):
-        for message in messages:
-            print(f"Received message by subscriber {self.id}: {message}")
-        return 0
+    def start_polling(self):
+        broker_thread = threading.Thread(target=self.poll_messages())
+        broker_thread.start()
 
     def unsubscribe(self, topic):
         try:
-            if self.client_id is not None:
-                self.broker.unsubscribe(topic, self.client_id)
-                self.client_id = None
+            self.broker.unsubscribe(topic, self.id)
+            self.topics.remove(topic)
         except Exception as e:
             print(f"Failed to unsubscribe: {e}")
+
+    def poll_messages(self, polling_interval=5):
+        while True:
+            try:
+                # skip poll if sub is not interested in any topics
+                if len(self.topics) == 0:
+                    continue
+                # Poll for new messages for the subscribed topics
+                for topic in self.topics:
+                    messages = self.broker.get_messages(topic)
+                    if messages:
+                        # Process received messages here
+                        for message in messages:
+                            print(f"Received message: {message}")
+
+                time.sleep(polling_interval)
+            except Exception as e:
+                print(f"Error while polling for messages: {e}")
