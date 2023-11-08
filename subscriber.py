@@ -17,7 +17,6 @@ class Subscriber:
 
     def subscribe(self, topic):
         try:
-
             self.broker.subscribe(topic, self.id)
             self.topics.append(topic)
         except Exception as e:

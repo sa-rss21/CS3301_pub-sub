@@ -65,6 +65,7 @@ class MessageBroker:
             self.message_queue.create_queue(topic)
         self.subscribers[topic].append(id)
 
+
     def unsubscribe(self, topic, id):
         if topic in self.subscribers and id in self.subscribers[topic]:
             self.subscribers[topic].remove(id)
