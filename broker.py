@@ -1,15 +1,15 @@
-import queue
 import threading
 import time
 import xmlrpc.client
 import xmlrpc.server
 import sys
 import json
-
+from queue import PriorityQueue
 class MessageQueueManager:
     def __init__(self):
         # Dictionary to store message queues with channel names as keys
         self.queues = {}
+        self.queue_limit = 100
 
     def get_queue(self, topic):
         # Get the message queue for the specified topic
@@ -18,26 +18,38 @@ class MessageQueueManager:
     def create_queue(self, topic):
         # Create a new message queue for the given channel
         if topic not in self.queues:
-            self.queues[topic] = queue.Queue()
+            self.queues[topic] = []
+        self.queues[topic].append(PriorityQueue())
 
     def delete_queue(self, topic):
         # Delete a message queue for the given channel
         if topic in self.queues:
-            del self.queues[topic]
+            for queue in self.queues[topic]:
+                if queue[1].qsize() == 0 and len(self.queues[topic]) > 1:
+                    del queue
 
-    def publish_message(self, topic, publisher_id, message):
+    def publish_message(self, message):
         # Publish a message to the specified channel
+        topic = message["topic"]
+        del message["topic"]
         if topic not in self.queues:
             self.create_queue(topic)
-
-        self.queues[topic].put((topic, publisher_id, time.asctime(), message))
+        for queue in self.queues[topic]:
+            if queue.qsize() < self.queue_limit:
+                queue.put((message["timestamp"], message))
+                break
+            else:
+                self.create_queue(topic)
+            if queue.qsize() == 0:
+                self.delete_queue(topic)
 
     def get_messages(self, topic):
         # Subscribe to a channel and receive messages
         if self.get_queue(topic):
-            while not self.queues[topic].empty():
-                # return all messages
-                yield self.queues[topic].get()
+            for queue in self.queues[topic]:
+                while not queue.empty():
+                    # return all messages
+                    yield queue.get()[1]
 
 
 class MessageBroker:
@@ -97,10 +109,10 @@ class MessageBroker:
         :param message: message-package to unpack and send to message queue manager
         :return: None
         """
-        content, publisher_id, topic = message["content"], message["id"], message["topic"]
+        topic = message["topic"]
         if not self.subscribers.get(topic):
             self.subscribers[topic] = []
-        self.message_queue.publish_message(topic, publisher_id, content)
+        self.message_queue.publish_message(message)
 
     def get_messages(self, topic, subscriber_id):
         """

@@ -5,6 +5,7 @@ import xmlrpc.server
 import sys
 import json
 
+
 class Subscriber:
 
     def __init__(self, subscriber_id, broker_url, poll_interval=2, max_retry_attempts=3):
@@ -14,6 +15,7 @@ class Subscriber:
         self.broker_url = broker_url
         self.topics = []
         self.broker = xmlrpc.client.ServerProxy(self.broker_url)
+        self.counter = 0
 
     def subscribe(self, topic):
         """
@@ -31,7 +33,6 @@ class Subscriber:
                 print(f"Failed to subscribe to {topic}: {e}")
                 retry_count += 1
                 time.sleep(1 / self.polling_interval)
-
 
     def start_polling(self):
         """
@@ -77,7 +78,7 @@ class Subscriber:
                             if messages:
                                 # Process received messages here
                                 for message in messages:
-                                    print(f"Received message for topic '{topic}': {message}")
+                                    self.handle_message(message)
                             break  # Break out of retry loop if successful
                         except Exception as e:
                             print(f"Error while polling for topic '{topic}': {e}")
@@ -87,6 +88,12 @@ class Subscriber:
 
             except Exception as e:
                 print(f"Error while polling for messages: {e}")
+
+    def handle_message(self, message):
+        self.counter += 1
+        print(f"Message from Subscriber {message['id']}: {message['content']} message count: {self.counter}")
+
+
 
 
 if __name__ == "__main__":
