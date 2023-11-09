@@ -91,10 +91,7 @@ class Subscriber:
 
     def handle_message(self, message):
         self.counter += 1
-        print(f"Message from Subscriber {message['id']}: {message['content']} message count: {self.counter}")
-
-
-
+        #print(f"Received Message from publisher {message['id']}: {message['content']}\nmessage count: {self.counter}")
 
 if __name__ == "__main__":
 
