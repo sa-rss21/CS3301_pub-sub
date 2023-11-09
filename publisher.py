@@ -1,3 +1,4 @@
+import time
 import xmlrpc.client
 import sys
 import json
@@ -7,7 +8,7 @@ class Publisher:
     def __init__(self, publisher_id, broker_url):
         self.id = publisher_id
         self.broker_url = broker_url
-        self.client = xmlrpc.client.ServerProxy(self.broker_url)
+        self.broker = xmlrpc.client.ServerProxy(self.broker_url)
 
     def publish(self, topic, message):
         """
@@ -17,8 +18,8 @@ class Publisher:
         :return: None
         """
         try:
-            message_format = {"topic": topic, "id": self.id, "content": message}
-            self.client.publish(message_format)
+            message_format = {"topic": topic, "id": self.id, "content": message, "timestamp": time.time()}
+            self.broker.publish(message_format)
         except Exception as e:
             print(f"Failed to publish message: {e}")
 
@@ -36,7 +37,7 @@ if __name__ == "__main__":
 
             # Use the dictionary in your code
             publisher = Publisher(my_dict["id"], my_dict["broker_url"])
-            publisher.client.publish(my_dict["topic"], my_dict["content"])
+            publisher.publish(my_dict["topic"], my_dict["content"])
         except json.JSONDecodeError as e:
             print("Error decoding JSON:", e)
     else:

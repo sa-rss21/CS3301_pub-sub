@@ -6,7 +6,7 @@ from broker import MessageBroker
 from publisher import Publisher
 from subscriber import Subscriber
 from concurrent.futures import ThreadPoolExecutor
-import threading
+
 
 
 def generate_random_message():
