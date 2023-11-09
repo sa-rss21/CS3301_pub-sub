@@ -15,41 +15,52 @@ class MessageQueueManager:
         # Get the message queue for the specified topic
         return self.queues.get(topic)
 
-    def create_queue(self, topic):
+    def create_topic(self, topic):
         # Create a new message queue for the given channel
         if topic not in self.queues:
             self.queues[topic] = []
-        self.queues[topic].append(PriorityQueue())
+            self.queues[topic].append(PriorityQueue())
 
-    def delete_queue(self, topic):
-        # Delete a message queue for the given channel
-        if topic in self.queues:
-            for queue in self.queues[topic]:
-                if queue[1].qsize() == 0 and len(self.queues[topic]) > 1:
-                    del queue
+    def clean_queues(self, topic):
+        for queue in self.queues[topic]:
+            if queue.empty() and len(self.queues[topic])> 1:
+                self.queues[topic].remove(queue)
 
     def publish_message(self, message):
         # Publish a message to the specified channel
         topic = message["topic"]
         del message["topic"]
         if topic not in self.queues:
-            self.create_queue(topic)
+            self.create_topic(topic)
+
+        # Find the first non-full queue and put the message there
         for queue in self.queues[topic]:
             if queue.qsize() < self.queue_limit:
                 queue.put((message["timestamp"], message))
-                break
-            else:
-                self.create_queue(topic)
-            if queue.qsize() == 0:
-                self.delete_queue(topic)
+                return
+
+        new_queue = PriorityQueue()
+        new_queue.put((message["timestamp"], message))
+        self.queues[topic].append(new_queue)
+
 
     def get_messages(self, topic):
+        self.display_queue_structure()
         # Subscribe to a channel and receive messages
         if self.get_queue(topic):
             for queue in self.queues[topic]:
                 while not queue.empty():
                     # return all messages
                     yield queue.get()[1]
+
+        # clean up empty queues
+        self.clean_queues(topic)
+
+    def display_queue_structure(self):
+        for topic, queues in self.queues.items():
+            print(f"TOPIC: {topic}")
+            for i, queue in enumerate(queues):
+                print(f"    Queue {i}: {queue.qsize()}/{self.queue_limit} messages")
 
 
 class MessageBroker:
@@ -88,7 +99,7 @@ class MessageBroker:
         if topic not in self.subscribers:
             self.subscribers[topic] = []
         if not self.message_queue.get_queue(topic):
-            self.message_queue.create_queue(topic)
+            self.message_queue.create_topic(topic)
         self.subscribers[topic].append(subscriber_id)
 
     def unsubscribe(self, topic, subscriber_id):
