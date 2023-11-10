@@ -37,12 +37,17 @@ class MessageQueueManager:
         for queue in self.queues[topic]:
             if queue.qsize() < self.queue_limit:
                 queue.put((message["timestamp"], message))
-                return
+                return 0
+
+        if len(self.queues[topic]) >= self.queue_limit:
+            print("Memory Overflow! Message cannot be placed in channel")
+            return -1
 
         new_queue = PriorityQueue()
         new_queue.put((message["timestamp"], message))
         self.queues[topic].append(new_queue)
 
+        return 0
 
     def get_messages(self, topic):
         self.display_queue_structure()
@@ -55,6 +60,7 @@ class MessageQueueManager:
 
         # clean up empty queues
         self.clean_queues(topic)
+        return 0
 
     def display_queue_structure(self):
         for topic, queues in self.queues.items():
