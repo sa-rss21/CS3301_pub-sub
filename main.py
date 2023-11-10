@@ -40,9 +40,12 @@ if __name__ == "__main__":
             message = generate_random_message()
             executor.submit(send_message, client_id, broker_url, topic, message)
             time.sleep(1 / num_clients)
+
+    with ThreadPoolExecutor(max_workers=num_clients) as executor:
+        for client_id in range(num_clients):
+            message = generate_random_message()
             executor.submit(send_message, client_id, broker_url, topic2, message)
             time.sleep(1 / num_clients)
-
     print(time.time() - start)
 
 
