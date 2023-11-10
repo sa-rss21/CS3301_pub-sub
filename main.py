@@ -8,7 +8,6 @@ from subscriber import Subscriber
 from concurrent.futures import ThreadPoolExecutor
 
 
-
 def generate_random_message():
     # Generate a random message
     characters = string.ascii_letters + string.digits  # You can modify this pool as per your requirements

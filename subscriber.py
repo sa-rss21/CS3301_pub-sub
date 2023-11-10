@@ -16,7 +16,6 @@ class Subscriber:
         self.topics = []
         self.broker = xmlrpc.client.ServerProxy(self.broker_url)
 
-
     def subscribe(self, topic):
         """
         calls the subscribe method on the broker to register this intance's interest in the topic
@@ -83,14 +82,14 @@ class Subscriber:
                         except Exception as e:
                             print(f"Error while polling for topic '{topic}': {e}")
                             retry_count += 1
-                            time.sleep(1/self.polling_interval)
+                            time.sleep(self.polling_interval/2)
                 time.sleep(self.polling_interval)
 
             except Exception as e:
                 print(f"Error while polling for messages: {e}")
 
     def handle_message(self, message, topic):
-        print(f"Received Message from publisher {message['id']} on topic {topic}: {message['content']}")
+        print(f"Message from ID-{message['id']} on topic {topic}: {message['content']}")
 
 
 if __name__ == "__main__":
