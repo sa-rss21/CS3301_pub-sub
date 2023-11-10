@@ -1,4 +1,5 @@
 import threading
+import time
 import xmlrpc.client
 import xmlrpc.server
 import sys
@@ -47,7 +48,7 @@ class MessageQueueManager:
         :param message: dictionary with message contents
         :return: None
         """
-
+        message["receive_timestamp"] = time.time()
         # Publish a message to the specified channel
         topic = message["topic"]
         del message["topic"]
@@ -57,7 +58,7 @@ class MessageQueueManager:
         # Find the first non-full queue and put the message there
         for queue in self.queues[topic]:
             if queue.qsize() < self.queue_limit:
-                queue.put((message["timestamp"], message))
+                queue.put((message["receive_timestamp"], message))
                 return 0
 
         if len(self.queues[topic]) >= self.queue_limit:
@@ -65,7 +66,7 @@ class MessageQueueManager:
             return -1
 
         new_queue = PriorityQueue()
-        new_queue.put((message["timestamp"], message))
+        new_queue.put((message["receive_timestamp"], message))
         self.queues[topic].append(new_queue)
 
         return 0

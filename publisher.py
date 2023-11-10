@@ -20,7 +20,7 @@ class Publisher:
         """
         try:
             retry_count = 0
-            message_format = {"topic": topic, "id": self.id, "content": message, "timestamp": time.time()}
+            message_format = {"topic": topic, "id": self.id, "content": message, "send_timestamp": time.time()}
             while retry_count < self.max_retry_attempts:
                 try:
                     ret = self.broker.publish(message_format)
