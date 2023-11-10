@@ -1,10 +1,10 @@
 import threading
-import time
 import xmlrpc.client
 import xmlrpc.server
 import sys
-import json
 from queue import PriorityQueue
+
+
 class MessageQueueManager:
     def __init__(self):
         # Dictionary to store message queues with channel names as keys
@@ -12,21 +12,42 @@ class MessageQueueManager:
         self.queue_limit = 100
 
     def get_queue(self, topic):
+        """
+        Grab the requested topic list of queues
+        :param topic: topic to retreive
+        :return: a list of PriorityQueues
+        """
         # Get the message queue for the specified topic
         return self.queues.get(topic)
 
     def create_topic(self, topic):
+        """
+        Create a new topic of interest in the queue manager
+        :param topic: topic to create
+        :return: None
+        """
         # Create a new message queue for the given channel
         if topic not in self.queues:
             self.queues[topic] = []
             self.queues[topic].append(PriorityQueue())
 
     def clean_queues(self, topic):
+        """
+        Iterates through a topic and removes any empty queues
+        :param topic: topic to search
+        :return: None
+        """
         for queue in self.queues[topic]:
             if queue.empty() and len(self.queues[topic])> 1:
                 self.queues[topic].remove(queue)
 
     def publish_message(self, message):
+        """
+        Takes the given message dictionary and publishes it in the correct queue
+        :param message: dictionary with message contents
+        :return: None
+        """
+
         # Publish a message to the specified channel
         topic = message["topic"]
         del message["topic"]
@@ -50,6 +71,12 @@ class MessageQueueManager:
         return 0
 
     def get_messages(self, topic, debug):
+        """
+        Retrieves all new messages in a given topic
+        :param topic: topic to search
+        :param debug: print queue structure if true
+        :return: list of messages
+        """
         if debug:
             self.display_queue_structure()
         # Subscribe to a channel and receive messages
@@ -64,6 +91,10 @@ class MessageQueueManager:
         return 0
 
     def display_queue_structure(self):
+        """
+        displays the current layout of the queue structure
+        :return: None
+        """
         for topic, queues in self.queues.items():
             print(f"TOPIC: {topic}")
             for i, queue in enumerate(queues):
@@ -72,7 +103,7 @@ class MessageQueueManager:
 
 class MessageBroker:
     """
-    Pub-sub Message Broker that uses XML middleware to publish and retreive messages from the MessageQueueManager
+    Pub-sub Message Broker that uses XML middleware to publish and retrieve messages from the MessageQueueManager
     """
     def __init__(self, url, debug=False):
         self.subscribers = {}
@@ -130,7 +161,7 @@ class MessageBroker:
         topic = message["topic"]
         if not self.subscribers.get(topic):
             self.subscribers[topic] = []
-        self.message_queue.publish_message(message)
+        return self.message_queue.publish_message(message)
 
     def get_messages(self, topic, subscriber_id):
         """
