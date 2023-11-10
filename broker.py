@@ -48,7 +48,6 @@ class MessageQueueManager:
         :param message: dictionary with message contents
         :return: None
         """
-        message["receive_timestamp"] = time.time()
         # Publish a message to the specified channel
         topic = message["topic"]
         del message["topic"]
@@ -58,7 +57,7 @@ class MessageQueueManager:
         # Find the first non-full queue and put the message there
         for queue in self.queues[topic]:
             if queue.qsize() < self.queue_limit:
-                queue.put((message["receive_timestamp"], message))
+                queue.put((message["send_timestamp"], message))
                 return 0
 
         if len(self.queues[topic]) >= self.queue_limit:
@@ -66,7 +65,7 @@ class MessageQueueManager:
             return -1
 
         new_queue = PriorityQueue()
-        new_queue.put((message["receive_timestamp"], message))
+        new_queue.put((message["send_timestamp"], message))
         self.queues[topic].append(new_queue)
 
         return 0
@@ -109,10 +108,15 @@ class MessageBroker:
     def __init__(self, url, debug=False):
         self.subscribers = {}
         self.message_queue = MessageQueueManager()
+        self.backup_queue = MessageQueueManager()
         url_trimmed = url.replace("http://", "").split(":")
         self.host = url_trimmed[0]
         self.port = int(url_trimmed[1])
         self.debug = debug
+
+        self.sync_threshold = 100
+        self.message_count = 0
+
         broker_thread = threading.Thread(target=self.start_listening)
         broker_thread.start()
 
@@ -127,6 +131,11 @@ class MessageBroker:
         server.register_function(self.publish, "publish")
         server.register_function(self.get_messages, "get_messages")
         server.serve_forever()
+
+    def sync_queues(self):
+        if self.message_count >= self.sync_threshold:
+            self.backup_queue.queues = self.message_queue.queues
+            self.message_count = 0
 
     def subscribe(self, topic, subscriber_id):
         """
@@ -162,7 +171,10 @@ class MessageBroker:
         topic = message["topic"]
         if not self.subscribers.get(topic):
             self.subscribers[topic] = []
-        return self.message_queue.publish_message(message)
+        ret = self.message_queue.publish_message(message)
+        self.message_count += 1
+        self.sync_queues()
+        return ret
 
     def get_messages(self, topic, subscriber_id):
         """
@@ -174,7 +186,12 @@ class MessageBroker:
 
         # checks that subscriber has access to the data
         if subscriber_id in self.subscribers[topic]:
-            return list(self.message_queue.get_messages(topic, self.debug))
+            try:
+                messages = list(self.message_queue.get_messages(topic, self.debug))
+                return messages
+            except Exception as e:
+                print(f"Error retrieving messages, queue crashed, getting backup: {e}")
+                return list(self.backup_queue.get_messages(topic, self.debug))
         else:
             print("Subscriber attempting to retreive messages that it is not subscribed to")
             return None
