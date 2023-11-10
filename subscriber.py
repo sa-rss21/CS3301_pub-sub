@@ -16,6 +16,9 @@ class Subscriber:
         self.topics = []
         self.broker = xmlrpc.client.ServerProxy(self.broker_url)
 
+        self.use_backup_queue = False  # Flag to indicate whether to use backup queue
+        self.backup_queue = None  # Backup queue to store messages in case of main queue failure
+
     def subscribe(self, topic):
         """
         calls the subscribe method on the broker to register this intance's interest in the topic
@@ -76,7 +79,7 @@ class Subscriber:
                             messages = self.broker.get_messages(topic, self.id)
                             if messages:
                                 # Process received messages here
-                                for message in messages:
+                                for message in self.broker.get_messages(topic, self.id):
                                     self.handle_message(message, topic)
                             break  # Break out of retry loop if successful
                         except Exception as e:
