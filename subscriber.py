@@ -15,7 +15,7 @@ class Subscriber:
         self.broker_url = broker_url
         self.topics = []
         self.broker = xmlrpc.client.ServerProxy(self.broker_url)
-        self.counter = 0
+
 
     def subscribe(self, topic):
         """
@@ -90,8 +90,8 @@ class Subscriber:
                 print(f"Error while polling for messages: {e}")
 
     def handle_message(self, message):
-        self.counter += 1
-        #print(f"Received Message from publisher {message['id']}: {message['content']}\nmessage count: {self.counter}")
+        print(f"Received Message from publisher {message['id']}: {message['content']}")
+
 
 if __name__ == "__main__":
 

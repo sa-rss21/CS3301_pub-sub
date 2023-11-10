@@ -49,8 +49,9 @@ class MessageQueueManager:
 
         return 0
 
-    def get_messages(self, topic):
-        self.display_queue_structure()
+    def get_messages(self, topic, debug):
+        if debug:
+            self.display_queue_structure()
         # Subscribe to a channel and receive messages
         if self.get_queue(topic):
             for queue in self.queues[topic]:
@@ -73,13 +74,13 @@ class MessageBroker:
     """
     Pub-sub Message Broker that uses XML middleware to publish and retreive messages from the MessageQueueManager
     """
-    def __init__(self, url):
+    def __init__(self, url, debug=False):
         self.subscribers = {}
         self.message_queue = MessageQueueManager()
         url_trimmed = url.replace("http://", "").split(":")
         self.host = url_trimmed[0]
         self.port = int(url_trimmed[1])
-
+        self.debug = debug
         broker_thread = threading.Thread(target=self.start_listening)
         broker_thread.start()
 
@@ -141,7 +142,7 @@ class MessageBroker:
 
         # checks that subscriber has access to the data
         if subscriber_id in self.subscribers[topic]:
-            return list(self.message_queue.get_messages(topic))
+            return list(self.message_queue.get_messages(topic, self.debug))
         else:
             print("Subscriber attempting to retreive messages that it is not subscribed to")
             return None
