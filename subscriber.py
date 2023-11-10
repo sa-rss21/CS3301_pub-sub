@@ -78,7 +78,7 @@ class Subscriber:
                             if messages:
                                 # Process received messages here
                                 for message in messages:
-                                    self.handle_message(message)
+                                    self.handle_message(message, topic)
                             break  # Break out of retry loop if successful
                         except Exception as e:
                             print(f"Error while polling for topic '{topic}': {e}")
@@ -89,8 +89,8 @@ class Subscriber:
             except Exception as e:
                 print(f"Error while polling for messages: {e}")
 
-    def handle_message(self, message):
-        print(f"Received Message from publisher {message['id']}: {message['content']}")
+    def handle_message(self, message, topic):
+        print(f"Received Message from publisher {message['id']} on topic {topic}: {message['content']}")
 
 
 if __name__ == "__main__":
