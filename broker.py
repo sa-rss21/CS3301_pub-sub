@@ -2,7 +2,6 @@ import threading
 import time
 import xmlrpc.client
 import xmlrpc.server
-import sys
 from queue import PriorityQueue
 
 
@@ -16,10 +15,13 @@ class MessageQueueManager:
         """
         Grab the requested topic list of queues
         :param topic: topic to retreive
-        :return: a list of PriorityQueues
+        :return: a list of PriorityQueues or None
         """
         # Get the message queue for the specified topic
-        return self.queues.get(topic)
+        if self.queues.get(topic):
+            return self.queues.get(topic)
+        else:
+            return None
 
     def create_topic(self, topic):
         """
@@ -64,10 +66,10 @@ class MessageQueueManager:
             print("Memory Overflow! Message cannot be placed in channel")
             return -1
 
+        # create new queue if there is room
         new_queue = PriorityQueue()
         new_queue.put((message["send_timestamp"], message))
         self.queues[topic].append(new_queue)
-
         return 0
 
     def get_messages(self, topic, debug):
@@ -84,7 +86,8 @@ class MessageQueueManager:
             for queue in self.queues[topic]:
                 while not queue.empty():
                     # return all messages
-                    yield queue.get()[1]
+                    message = queue.get()[1]
+                    yield message
 
         # clean up empty queues
         self.clean_queues(topic)
@@ -116,7 +119,7 @@ class MessageBroker:
 
         self.sync_threshold = 100
         self.message_count = 0
-
+        self.server = None
         broker_thread = threading.Thread(target=self.start_listening)
         broker_thread.start()
 
@@ -125,17 +128,21 @@ class MessageBroker:
         Starts the XML server to receive requests from clients, either publishers or subscribers
         :return: None
         """
-        server = xmlrpc.server.SimpleXMLRPCServer((self.host, self.port), allow_none=True)
-        server.register_function(self.subscribe, "subscribe")
-        server.register_function(self.unsubscribe, "unsubscribe")
-        server.register_function(self.publish, "publish")
-        server.register_function(self.get_messages, "get_messages")
-        server.serve_forever()
+        self.server = xmlrpc.server.SimpleXMLRPCServer((self.host, self.port), allow_none=True)
+        self.server.register_function(self.subscribe, "subscribe")
+        self.server.register_function(self.unsubscribe, "unsubscribe")
+        self.server.register_function(self.publish, "publish")
+        self.server.register_function(self.get_messages, "get_messages")
+        self.server.serve_forever()
 
     def sync_queues(self):
-        if self.message_count >= self.sync_threshold:
+        if self.message_count >= self.sync_threshold and self.message_queue.queues is not None:
             self.backup_queue.queues = self.message_queue.queues
             self.message_count = 0
+
+    def recover_queue(self):
+        if self.message_queue.queues is None:
+            self.message_queue.queues = self.backup_queue.queues
 
     def subscribe(self, topic, subscriber_id):
         """
@@ -162,18 +169,31 @@ class MessageBroker:
             if not self.subscribers[topic]:
                 del self.subscribers[topic]
 
+    def kill_queue(self):
+        self.message_queue.queues = None
+
     def publish(self, message):
         """
         Publishes message to the message queue
         :param message: message-package to unpack and send to message queue manager
         :return: None
         """
-        topic = message["topic"]
-        if not self.subscribers.get(topic):
-            self.subscribers[topic] = []
-        ret = self.message_queue.publish_message(message)
-        self.message_count += 1
-        self.sync_queues()
+        ret = -1
+        retry_count = 0
+        while retry_count < 3:
+            try:
+                topic = message["topic"]
+                if not self.subscribers.get(topic):
+                    self.subscribers[topic] = []
+                ret = self.message_queue.publish_message(message)
+                self.message_count += 1
+                self.sync_queues()
+                break
+            except Exception as e:
+                print(f"Queue crashed, retreiving backup and retrying: {e}")
+                self.recover_queue()
+                retry_count += 1
+
         return ret
 
     def get_messages(self, topic, subscriber_id):
@@ -183,31 +203,34 @@ class MessageBroker:
         :param subscriber_id: ID of the subscriber requesting the message
         :return: None
         """
-
+        messages = None
         # checks that subscriber has access to the data
         if subscriber_id in self.subscribers[topic]:
+
             try:
                 messages = list(self.message_queue.get_messages(topic, self.debug))
-                return messages
             except Exception as e:
                 print(f"Error retrieving messages, queue crashed, getting backup: {e}")
-                return list(self.backup_queue.get_messages(topic, self.debug))
+                self.recover_queue()
+                messages = list(self.message_queue.get_messages(topic, self.debug))
         else:
             print("Subscriber attempting to retreive messages that it is not subscribed to")
-            return None
+
+        return sorted(messages, key=lambda x: x["send_timestamp"])
+
+    def connection_interruption(self):
+        self.server.shutdown()
+        time.sleep(5)
+        broker_thread = threading.Thread(target=self.start_listening)
+        broker_thread.start()
 
     def has_subscribers(self, topic):
         return len(self.subscribers.get(topic, [])) != 0
 
 
 if __name__ == "__main__":
-
-    num_args = len(sys.argv) - 1
-    if num_args == 1:
-        try:
-            # Use the dictionary in your code
-            broker = MessageBroker(sys.argv[1])
-        except Exception as e:
-            print("Error starting broker:", e)
-    else:
-        print("Usage: python script.py 'url'")
+    try:
+        # Use the dictionary in your code
+        broker = MessageBroker("http://localhost:8000")
+    except Exception as e:
+        print("Error starting broker:", e)

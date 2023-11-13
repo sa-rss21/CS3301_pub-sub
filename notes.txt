@@ -1,7 +1,0 @@
-- Middleware is the message queue/topics/channels
-    a. Which to use (leaning towards SOAP)
-- Example: Upload service (Publishers), Compress Service Format Service, and notif Service (Subscribers)
-    - Publisher gets immediate response when uploading a file to middleware
-    - When file is compressed, it uploads it back to the Queue to cause decoupling b/w subscribed services
-    - Then the format service consumes that compressed file and uploads the results (4k 1080p 720p) to the queue
-    - 
