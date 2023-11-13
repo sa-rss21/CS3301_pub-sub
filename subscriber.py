@@ -74,17 +74,22 @@ class Subscriber:
 
                 for topic in self.topics:
                     retry_count = 0
-                    while retry_count < self.max_retry_attempts:
+                    while retry_count < self.max_retry_attempts:  # for connection fault protection
                         try:
                             messages = self.broker.get_messages(topic, self.id)
                             if messages:
                                 # Process received messages here
-                                for message in self.broker.get_messages(topic, self.id):
+                                for message in messages:
                                     self.handle_message(message, topic)
+
                             break  # Break out of retry loop if successful
                         except Exception as e:
                             print(f"Error while polling for topic '{topic}': {e}")
                             retry_count += 1
+                            try:
+                                self.broker = xmlrpc.client.ServerProxy(self.broker_url)
+                            except Exception:
+                                pass
                             time.sleep(self.polling_interval/2)
                 time.sleep(self.polling_interval)
 
@@ -99,13 +104,11 @@ if __name__ == "__main__":
 
     num_args = len(sys.argv) - 1
     if num_args == 1:
-        # Get the JSON-encoded string from the command line
-        json_string = sys.argv[1]
 
+        id = sys.argv[1]
         try:
             # Parse the JSON string into a dictionary
-            my_dict = json.loads(json_string)
-
+            my_dict = {"id": id, "broker_url": "http://localhost:8000", "topic": "T1"}
             # Use the dictionary in your code
             subscriber = Subscriber(my_dict["id"], my_dict["broker_url"])
             subscriber.subscribe(my_dict["topic"])
@@ -113,4 +116,4 @@ if __name__ == "__main__":
         except json.JSONDecodeError as e:
             print("Error decoding JSON:", e)
     else:
-        print("Usage: python script.py '<json_string>'")
+        print("Usage: python script.py 'id'")

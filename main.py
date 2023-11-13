@@ -28,14 +28,22 @@ if __name__ == "__main__":
 
     topic = "T1"
     topic2 = "T2"
+    # start broker
     broker = MessageBroker(broker_url)
+    # start subscriber and subscribe to topics
     subscriber = Subscriber(1, broker_url, poll_interval=2)
     subscriber.subscribe(topic)
     subscriber.subscribe(topic2)
     subscriber.start_polling()
 
+    # publish messages with connection fault
     with ThreadPoolExecutor(max_workers=num_clients) as executor:
         for client_id in range(num_clients):
+            # mimic a temporary interruption
+            if client_id == num_clients/2:
+                broker.connection_interruption()
+                time.sleep(1)
+
             message = generate_random_message()
             executor.submit(send_message, client_id, broker_url, topic, message)
             time.sleep(1 / num_clients)
@@ -45,6 +53,4 @@ if __name__ == "__main__":
             message = generate_random_message()
             executor.submit(send_message, client_id, broker_url, topic2, message)
             time.sleep(1 / num_clients)
-    print(time.time() - start)
-
 
